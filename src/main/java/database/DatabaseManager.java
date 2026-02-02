@@ -1,16 +1,18 @@
 package database;
 
 import Hash.HashManager;
+import io.github.cdimascio.dotenv.Dotenv;
 
 import java.sql.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class DatabaseManager {
+    Dotenv dotenv = Dotenv.load();
     // Configuración de la base de datos sacada las variables de entorno
-    private static final String URL = System.getenv("DB_URL");
-    private static final String USER = System.getenv("DB_USER");
-    private static final String PASS = System.getenv("DB_PASS");
+    private static final String URL = Dotenv.load().get("DB_URL");
+    private static final String USER = Dotenv.load().get("DB_USER");
+    private static final String PASS = Dotenv.load().get("DB_PASSWORD");
 
     //Logger para debuggear posibles errores
     private static final Logger LOGGER = Logger.getLogger(DatabaseManager.class.getName());
@@ -27,12 +29,12 @@ public class DatabaseManager {
     /**
      * Registra un nuevo usuario aplicando Hash a la contraseña.
      *
-     * @param username Nombre del usuario.
+     * @param user     Nombre del usuario.
      * @param password Contraseña en texto plano que será hasheada.
      * @return boolean true si se registró con éxito.
      */
-    public synchronized boolean userRegiter(String username, String password) {
-        String query = "INSERT INTO users (username, password) VALUES (?,?)";
+    public boolean userRegister(String user, String password) {
+        String query = "INSERT INTO user (username, password_hash) VALUES (?,?)";
 
         //Se genera el hash del password antes de insertarlo en la base de datos
         String hashedPassword = HashManager.hash(password);
@@ -41,22 +43,76 @@ public class DatabaseManager {
              PreparedStatement statement = connection.prepareStatement(query)) {
 
             //Asignar los parametros a la consulta
-            statement.setString(1, username);
+            statement.setString(1, user);
             statement.setString(2, hashedPassword);
 
             //Ejecutar la consulta y comprobar si se ha insertado correctamente
             int affectedRows = statement.executeUpdate();
-            LOGGER.info("Usuario: " + username + " registrado correctamente");
+            LOGGER.info("Usuario: " + user + " registrado correctamente");
 
             //Si las filas afectadas son mayores a 0, se ha registrado correctamente y devuelve true
             return affectedRows > 0;
 
 
         } catch (SQLException ex) {
-            LOGGER.log(Level.SEVERE, "Error al registrar usuario: " + username);
+            LOGGER.log(Level.SEVERE, "Error al registrar usuario: " + user);
+            ex.printStackTrace();
             return false;
         }
 
+    }
+
+    /**
+     * Actualiza la contraseña de un usuario en la base de datos.
+     *
+     * @param username    El nombre del usuario cuyo registro será actualizado.
+     * @param newPassword La nueva contraseña en texto plano que será hasheada antes de ser almacenada.
+     **/
+
+    public boolean updateUser(String username, String newPassword) {
+        String query = "UPDATE user SET password_hash = ? WHERE username = ?";
+        String newPassHash = HashManager.hash(newPassword);
+
+        try (Connection connection = connection();
+             PreparedStatement statement = connection.prepareStatement(query)) {
+            //Asignar los parametros a la consulta
+            statement.setString(1, newPassHash);
+            statement.setString(2, username);
+
+            int rows = statement.executeUpdate();
+            //retorna true si afecta alguna fila
+            return rows > 0;
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+
+
+    }
+
+    /**
+     * Elimina un usuario de la base de datos según su nombre de usuario.
+     *
+     * @param username El nombre del usuario que se desea eliminar.
+     * @return boolean true si el usuario fue eliminado exitosamente, false en caso contrario.
+     */
+    public boolean deleteUser(String username) {
+        String query = "DELETE FROM user WHERE username = ?";
+
+        try (Connection connection = connection();
+             PreparedStatement statement = connection.prepareStatement(query)) {
+            //Asignar los parametros a la consulta
+            statement.setString(1, username);
+
+            int rows = statement.executeUpdate();
+            //retorna true si afecta alguna
+            return rows > 0;
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
     }
 
     /**
@@ -69,7 +125,7 @@ public class DatabaseManager {
      */
     public synchronized boolean validateUser(String username, String password) {
         //Consulta para buscar la password del usuario en la base de datos por su username
-        String query = "SELECT password_hash FROM users WHERE username = ?";
+        String query = "SELECT password_hash FROM user WHERE username = ?";
         //Hasheamos la contraseña antes de compararla con la de la base de datos, para comparar por hash
         String hashedPassword = HashManager.hash(password);
 
