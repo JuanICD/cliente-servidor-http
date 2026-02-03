@@ -92,9 +92,9 @@ public class Client {
 
     private static void deleteUser() throws IOException, InterruptedException {
         System.out.print("Introduce usuario a eliminar: ");
-        String user = scaner.nextLine();
+        String user = scaner.next();
 
-        // Tu servidor espera leer el body para saber a quién borrar
+        // El servidor espera leer el body para saber a quién borrar
         String body = "username=" + user;
 
         HttpRequest request = HttpRequest.newBuilder()

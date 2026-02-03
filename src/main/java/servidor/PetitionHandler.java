@@ -9,6 +9,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class PetitionHandler implements HttpHandler {
@@ -17,14 +18,22 @@ public class PetitionHandler implements HttpHandler {
     @Override
     public void handle(HttpExchange exchange) throws IOException {
 
-        //Obtenemos el tipo de la peticion, en mayúsculas para evitar errores
-        String method = exchange.getRequestMethod().toUpperCase();
+        try {
+            //Obtenemos el tipo de la peticion, en mayúsculas para evitar errores
+            String method = exchange.getRequestMethod().toUpperCase();
 
-        switch (method) {
-            case "POST" -> handlePOST(exchange);
-            case "PUT" -> handlePUT(exchange);
-            case "DELETE" -> handleDELETE(exchange);
-            default -> exchange.sendResponseHeaders(405, 0);
+            switch (method) {
+                case "POST" -> handlePOST(exchange);
+                case "PUT" -> handlePUT(exchange);
+                case "DELETE" -> handleDELETE(exchange);
+                default -> exchange.sendResponseHeaders(405, 0);
+            }
+
+        } catch (Exception e) {
+            LOGGER.log(Level.SEVERE, "Fallo en el manejador de peticiones intentalo de nuevo:\n" + e.getMessage());
+            e.printStackTrace();
+        } finally {
+            exchange.close();
         }
 
 
@@ -65,7 +74,6 @@ public class PetitionHandler implements HttpHandler {
             //Codigo de respuesta 409 para usuario ya existente
             exchange.sendResponseHeaders(409, 0);
         }
-        exchange.close();
 
     }
 
