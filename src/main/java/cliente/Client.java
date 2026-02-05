@@ -10,44 +10,93 @@ import java.util.Scanner;
 public class Client {
 
     private static final String BASE_URL = "http://localhost:8080/users";
+    private static final String LOGIN_URL = "http://localhost:8080/login";
     private static final HttpClient client = HttpClient.newHttpClient();
     private static final Scanner scaner = new Scanner(System.in);
 
 
     public static void main(String[] args) {
-        boolean running = true;
         System.out.println("------ CLIENTE HTTP INICIADO ------");
 
+        try {
+            boolean exit = false;
+            while (!exit) {
+                System.out.println("\n--- BIENVENIDO ---");
+                System.out.println("1. Registrarse");
+                System.out.println("2. Iniciar Sesión");
+                System.out.println("3. Salir");
+                System.out.print("> ");
+
+                String mainOption = scaner.next();
+
+                switch (mainOption) {
+                    case "1" -> userRegister();
+                    case "2" -> {
+                        if (login()) {
+                            showMenu();
+                        }
+                    }
+                    case "3" -> {
+                        exit = true;
+                        System.out.println("Cerrando cliente...");
+                    }
+                    default -> System.out.println("Opción no válida.");
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Error: " + e.getMessage());
+        }
+    }
+
+    private static void showMenu() throws Exception {
+        boolean running = true;
         while (running) {
             System.out.println("\nSeleccione una operación:");
             System.out.println("1. Registrar Usuario (POST)");
             System.out.println("2. Actualizar Contraseña (PUT)");
             System.out.println("3. Eliminar Usuario (DELETE)");
-            System.out.println("4. Salir");
+            System.out.println("4. Cerrar Sesión");
             System.out.print("> ");
 
             String option = scaner.next();
 
-            try {
-                switch (option) {
-                    case "1" -> userRegister();
-                    case "2" -> updateUser();
-                    case "3" -> deleteUser();
-                    case "4" -> {
-                        running = false;
-                        System.out.println("Cerrando cliente...");
-                    }
-                    default -> System.out.println("Opción no válida.");
+            switch (option) {
+                case "1" -> userRegister();
+                case "2" -> updateUser();
+                case "3" -> deleteUser();
+                case "4" -> {
+                    running = false;
+                    System.out.println("Cerrando sesión...");
                 }
-
-            } catch (Exception e) {
-
-                System.err.println("Error de comunicacion con el servidor: " + e.getMessage());
+                default -> System.out.println("Opción no válida.");
             }
-
-
         }
+    }
 
+    private static boolean login() throws Exception {
+        System.out.println("\n--- INICIO DE SESIÓN ---");
+        System.out.print("Nombre de usuario: ");
+        String username = scaner.next();
+        System.out.print("Contraseña: ");
+        String password = scaner.next();
+
+        String body = "username=" + username + "&password=" + password;
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(LOGIN_URL))
+                .header("Content-Type", "application/x-www-form-urlencoded")
+                .POST(HttpRequest.BodyPublishers.ofString(body))
+                .build();
+
+        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+        if (response.statusCode() == 200) {
+            System.out.println(response.body());
+            return true;
+        } else {
+            System.out.println(response.body() + " (Código: " + response.statusCode() + ")");
+            return false;
+        }
     }
 
     private static void userRegister() throws Exception {
@@ -74,10 +123,12 @@ public class Client {
 
         System.out.println("Nombre del usuario a actualizar: ");
         String username = scaner.next();
+        System.out.println("Contraseña antigua: ");
+        String oldPassword = scaner.next();
         System.out.println("Nueva contraseña: ");
-        String password = scaner.next();
+        String newPassword = scaner.next();
 
-        String body = "username=" + username + "&password=" + password;
+        String body = "username=" + username + "&oldPassword=" + oldPassword + "&newPassword=" + newPassword;
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(BASE_URL))
@@ -109,24 +160,18 @@ public class Client {
 
     private static void sendAndProcess(HttpRequest request, String action) throws IOException, InterruptedException {
         System.out.println("Enviando petición al servidor...");
-
+        //Envia la peticion y espera la respuesta
         HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
         int codigo = response.statusCode();
 
         System.out.println("--- Respuesta del Servidor ---");
         System.out.println("Código: " + codigo);
+        System.out.println("Mensaje: " + response.body());
 
-        // Interpretación de los códigos según tu Servidor
         if (codigo == 200 || codigo == 201) {
             System.out.println("Exito: " + action + " completada correctamente.");
-        } else if (codigo == 409) {
-            System.out.println("Error: Conflicto (El usuario ya existe).");
-        } else if (codigo == 404) {
-            System.out.println("Error: No encontrado (El usuario no existe).");
-        } else if (codigo == 400) {
-            System.out.println("Error: Petición incorrecta (Datos faltantes).");
         } else {
-            System.out.println("Error desconocido.");
+            System.out.println("Fallo en la operación " + action);
         }
 
     }

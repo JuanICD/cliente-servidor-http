@@ -20,6 +20,9 @@ public class Server {
             //Registramos la ruta de registro y le añadimos la clase manejadora de las peticiones
             server.createContext("/users",new PetitionHandler());
 
+            //Ruta de login
+            server.createContext("/login",new LoginHandler());
+
             // Configuramos un ejecutor por defecto (permite concurrencia básica)
             server.setExecutor(null);
 

@@ -4,6 +4,8 @@ import Hash.HashManager;
 import io.github.cdimascio.dotenv.Dotenv;
 
 import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -123,7 +125,7 @@ public class DatabaseManager {
      * @param password El password proporcionado por el usuario.
      * @return boolean true si las credenciales coinciden, false si no.
      */
-    public synchronized boolean validateUser(String username, String password) {
+    public boolean validateUser(String username, String password) {
         //Consulta para buscar la password del usuario en la base de datos por su username
         String query = "SELECT password_hash FROM user WHERE username = ?";
         //Hasheamos la contraseña antes de compararla con la de la base de datos, para comparar por hash
@@ -150,6 +152,28 @@ public class DatabaseManager {
             return false;
         }
 
+    }
+    /**
+     * Obtiene una lista de todos los nombres de usuario registrados.
+     *
+     * @return Una lista de Strings con los nombres de usuario.
+     */
+    public List<String> getAllUsers() {
+        String query = "SELECT username FROM user";
+        List<String> users = new ArrayList<>();
+
+        try (Connection conn = connection();
+             PreparedStatement ps = conn.prepareStatement(query);
+             ResultSet rs = ps.executeQuery()) {
+
+            while (rs.next()) {
+                users.add(rs.getString("username"));
+            }
+        } catch (SQLException e) {
+            LOGGER.log(Level.SEVERE, "Error al obtener usuarios");
+            e.printStackTrace();
+        }
+        return users;
     }
 
 }

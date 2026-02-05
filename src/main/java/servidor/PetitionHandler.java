@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -23,6 +24,7 @@ public class PetitionHandler implements HttpHandler {
             String method = exchange.getRequestMethod().toUpperCase();
 
             switch (method) {
+                case "GET" -> handleGET(exchange);
                 case "POST" -> handlePOST(exchange);
                 case "PUT" -> handlePUT(exchange);
                 case "DELETE" -> handleDELETE(exchange);
@@ -39,6 +41,43 @@ public class PetitionHandler implements HttpHandler {
 
     }
 
+
+    /**
+     * Gestiona una solicitud HTTP GET para listar los usuarios en el navegador.
+     * Envía una respuesta en formato HTML con la lista de usuarios.
+     *
+     * @param exchange El objeto HTTP Exchange.
+     * @throws IOException Si hay un error de E/S.
+     */
+    private void handleGET(HttpExchange exchange) throws IOException {
+        DatabaseManager db = new DatabaseManager();
+        List<String> users = db.getAllUsers();
+
+        String response = """
+                USUARIOS REGISTRADOS:
+                ----------------------
+                """;
+        //Comprobacion de que hay usuarios registrados
+        if (users.isEmpty()) {
+            response += "No hay usuarios registrados.";
+        } else {
+            for (String user : users) {
+                response += user + "\n";
+            }
+        }
+
+        exchange.getResponseHeaders().set("Content-Type", "text/plain");
+
+        byte[] responseBytes = response.getBytes();
+        exchange.sendResponseHeaders(200, responseBytes.length);
+
+        //Para escribir en el flujo de salida
+        try (var os = exchange.getResponseBody()) {
+            os.write(responseBytes);
+        }
+
+
+    }
 
     // Metodo POST del usuario
 
@@ -68,11 +107,17 @@ public class PetitionHandler implements HttpHandler {
         boolean registered = db.userRegister(user, pass);
 
         if (registered) {
-            //Codigo de respuesta 201 para usuario creado correctamente
-            exchange.sendResponseHeaders(201, 0);
+            String response = "Usuario registrado correctamente.";
+            exchange.sendResponseHeaders(201, response.getBytes().length);
+            try (var os = exchange.getResponseBody()) {
+                os.write(response.getBytes());
+            }
         } else {
-            //Codigo de respuesta 409 para usuario ya existente
-            exchange.sendResponseHeaders(409, 0);
+            String response = "Error: El usuario ya existe.";
+            exchange.sendResponseHeaders(409, response.getBytes().length);
+            try (var os = exchange.getResponseBody()) {
+                os.write(response.getBytes());
+            }
         }
 
     }
@@ -100,11 +145,17 @@ public class PetitionHandler implements HttpHandler {
         boolean deleted = db.deleteUser(user);
 
         if (deleted) {
-            //Codigo de respuesta 200 para usuario eliminado correctamente
-            exchange.sendResponseHeaders(200, 0);
+            String response = "Usuario eliminado correctamente.";
+            exchange.sendResponseHeaders(200, response.getBytes().length);
+            try (var os = exchange.getResponseBody()) {
+                os.write(response.getBytes());
+            }
         } else {
-            //Codigo de respuesta 404 para usuario no encontrado
-            exchange.sendResponseHeaders(404, 0);
+            String response = "Error: El usuario no existe.";
+            exchange.sendResponseHeaders(404, response.getBytes().length);
+            try (var os = exchange.getResponseBody()) {
+                os.write(response.getBytes());
+            }
         }
 
     }
@@ -114,22 +165,44 @@ public class PetitionHandler implements HttpHandler {
         Map<String, String> data = readBody(exchange);
 
         String user = data.get("username");
-        String pass = data.get("password");
+        String oldPass = data.get("oldPassword");
+        String newPass = data.get("newPassword");
 
-        if (user == null || pass == null) {
-            exchange.sendResponseHeaders(400, 0);
+        if (user == null || oldPass == null || newPass == null) {
+            String response = "Error: Faltan datos (username, oldPassword o newPassword).";
+            exchange.sendResponseHeaders(400, response.getBytes().length);
+            try (var os = exchange.getResponseBody()) {
+                os.write(response.getBytes());
+            }
             return;
         }
 
         DatabaseManager db = new DatabaseManager();
-        boolean updated = db.updateUser(user, pass);
+        
+        // Primero validamos la contraseña antigua
+        if (!db.validateUser(user, oldPass)) {
+            String response = "Error: La contraseña antigua no es correcta.";
+            exchange.sendResponseHeaders(401, response.getBytes().length);
+            try (var os = exchange.getResponseBody()) {
+                os.write(response.getBytes());
+            }
+            return;
+        }
+
+        boolean updated = db.updateUser(user, newPass);
 
         if (updated) {
-            //Codigo de respuesta 200 para
-            exchange.sendResponseHeaders(200, 0);
+            String response = "Contraseña actualizada correctamente.";
+            exchange.sendResponseHeaders(200, response.getBytes().length);
+            try (var os = exchange.getResponseBody()) {
+                os.write(response.getBytes());
+            }
         } else {
-            //Codigo de respuesta 404 para usuario no encontrado
-            exchange.sendResponseHeaders(404, 0);
+            String response = "Error: No se pudo actualizar la contraseña (usuario no encontrado).";
+            exchange.sendResponseHeaders(404, response.getBytes().length);
+            try (var os = exchange.getResponseBody()) {
+                os.write(response.getBytes());
+            }
         }
 
     }
